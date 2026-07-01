@@ -74,6 +74,49 @@ head(es)
 - For a condensed method overview, see [method-card.md](./method-card.md)
 - Using your own data? See Phase 1: Data Preparation below for format requirements.
 
+### Your First Analysis in 5 Minutes
+
+```r
+# Step 1: Install and load
+install.packages("staggered")  # one-time
+library(staggered)
+
+# Step 2: Load built-in data (Chicago police training study)
+data(pj_officer_level_balanced)
+
+# Step 3: Estimate (simple average treatment effect)
+result <- staggered(
+  df = pj_officer_level_balanced,
+  i = "uid", t = "period", g = "first_trained", y = "complaints",
+  estimand = "simple"
+)
+print(result)
+#>       estimate          se   se_neyman
+#> 1 -0.001126981 0.002115194 0.002119248
+
+# Step 4: Check the random timing assumption
+bc <- balance_checks(
+  df = pj_officer_level_balanced,
+  i = "uid", t = "period", g = "first_trained", y = "complaints",
+  estimand = "simple"
+)
+print(bc$resultsDF[, c("Xhat", "pvalue_Wald")])
+#> Non-significant p-value supports the random timing assumption.
+
+# Step 5: Interpret
+# estimate ≈ -0.001: Training reduced complaints by ~0.001 per officer-month
+# se ≈ 0.002: Not statistically significant at conventional levels
+# Conclusion: No strong evidence of training effect on complaints
+```
+
+**Using your own data?** Ensure:
+1. Balanced panel (one row per unit × period, no gaps)
+2. Treatment is absorbing (once treated, always treated)
+3. Encode never-treated units as `g = Inf`
+4. At least 2 units per treatment cohort
+
+→ Then replace column names in the call above with your variable names.
+
 ---
 
 ## Activation
@@ -664,6 +707,8 @@ if (any(result$se == 0)) {
 - ≥5 units per cohort for stable variance estimates
 - ≥3 pre-treatment and ≥3 post-treatment periods for event-study
 
+> **See also:** [Troubleshooting](#troubleshooting) for quick fixes to common errors encountered during estimation.
+
 ---
 
 ## Anti-Patterns
@@ -835,6 +880,48 @@ For non-standard aggregation schemes, you can provide custom weight matrices:
 # Example: effect for cohort g=5 only, averaged over post-treatment periods
 # (Consult estimators/staggered.md for full details on custom A_theta construction)
 ```
+
+---
+
+## Troubleshooting
+
+### Error: "non-conformable arguments" when using beta=0
+`staggered` v1.2.3 does not support `beta = 0` due to an internal dimension-handling issue. Use `beta = NULL` (default, optimal) instead.
+
+→ See also: [Pitfall 4](#pitfall-4-ignoring-efficiency-gains-using-cssa-when-staggered-is-better) (β parameter guidance)
+
+### Error: "argument is of length zero" after singleton warning
+All treatment cohorts in your data have only 1 unit. After the package drops singletons, no data remains. **Fix**: Ensure at least some cohorts have ≥2 units, or coarsen treatment timing (e.g., monthly → quarterly).
+
+→ See also: [Pitfall 2](#pitfall-2-singleton-cohorts-only-1-unit-in-a-treatment-cohort), [Pitfall 10](#pitfall-10-all-singleton-cohorts-cause-crash)
+
+### Error: "unused argument (by = 'g')" with skip_data_check=TRUE
+`skip_data_check = TRUE` assumes data is already a pre-processed `data.table` with columns named exactly `i`, `t`, `g`, `y`. If your columns have different names, do NOT use this flag.
+
+### Warning: "Dropping units who were treated in the first period or earlier"
+This is expected behavior of `staggered_cs()`. Units treated before or at `min(t)` are early-treated and excluded from the DiD comparison. If many units are dropped, consider whether the CS estimator is appropriate for your design.
+
+→ See also: [Pitfall 1](#pitfall-1-unbalanced-panel-missing-i-t-combinations) (data quality)
+
+### SE = 0 in results
+Your effective sample is too small for reliable variance estimation. Ensure ≥5 units per cohort and ≥3 post-treatment periods.
+
+→ See also: [Pitfall 11](#pitfall-11-extremely-small-samples-return-se--0)
+
+### Event-study returns estimate = 0 for some lags
+Negative `eventTime` values (e.g., -1) are base-period references, normalized to zero by construction. This is standard event-study behavior, not an error.
+
+→ See also: [Pitfall 5](#pitfall-5-misinterpreting-eventtime-parameter)
+
+### Fisher test is very slow
+`compute_fisher = TRUE` with 500 permutations takes ~30-60 seconds on typical hardware. Reduce `num_fisher_permutations` for faster exploratory analysis, or increase for publication-quality p-values.
+
+→ See also: [Pitfall 7](#pitfall-7-using-compute_fisher-without-understanding-computational-cost)
+
+### Results differ between staggered_cs() and staggered(beta=1, use_DiD_A0=TRUE)
+On most datasets these are equivalent, but `staggered_cs()` also drops early-treated units (`g ≤ min(t)`). If your data has such units, results will differ. Always use the wrapper function in practice.
+
+→ See also: [Anti-Pattern 2](#anti-pattern-2-manual-β--1-instead-of-using-wrappers)
 
 ---
 

@@ -192,6 +192,21 @@ cat("Fisher p-value (Neyman SE):", result_fisher$fisher_pval_se_neyman, "\n")
 
 These are automatically performed by the package but should be verified manually before estimation:
 
+#### Minimum Data Requirements
+
+Before running any estimation, verify your data meets these requirements:
+
+| Requirement | Minimum | Recommended | Check |
+|---|---|---|---|
+| Units per cohort | ≥2 | ≥5 | `table(df[!duplicated(df$uid),]$first_trained)` |
+| Treatment cohorts | ≥2 | ≥3 | `length(unique(df$first_trained[df$first_trained != Inf]))` |
+| Time periods | ≥3 | ≥10 | `length(unique(df$period))` |
+| Pre-treatment periods | ≥1 | ≥3 | Periods before earliest treatment |
+| Panel balance | Complete | Complete | `nrow(df) == n_units * n_periods` |
+| Never-treated group | Required | Required | `any(df$first_trained == Inf)` |
+
+If any minimum is not met, estimation may fail or produce unreliable results (SE=0, crashes).
+
 #### Panel Balance Verification
 
 ```r
