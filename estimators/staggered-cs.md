@@ -151,7 +151,7 @@ The CS estimator is **sub-optimal** under random treatment timing because it fix
 $$\text{Var}(\hat{\theta}_1) \geq \text{Var}(\hat{\theta}_{\beta^*})$$
 
 **Efficiency loss in simulations (Roth & Sant'Anna 2023):**
-- Standard deviations 1.39–1.85× larger than the efficient estimator
+- Standard deviations approximately 1.4–1.9× larger than the efficient estimator
 - Equivalent sample size loss: 2–3.4× (you would need 2–3.4× more data to achieve the same precision with CS)
 - Loss increases with lower outcome autocorrelation (farther from unit root)
 

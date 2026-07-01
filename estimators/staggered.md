@@ -146,7 +146,7 @@ The efficient estimator achieves the semiparametric efficiency bound within the 
 $$\text{Var}(\hat{\theta}_{\beta^*}) = V_{\hat{\theta}_0} - V_{\hat{\theta}_0,\hat{X}} V_{\hat{X}}^{-1} V_{\hat{X},\hat{\theta}_0}$$
 
 **Efficiency gains in simulations (Roth & Sant'Anna 2023, Table 1):**
-- vs Callaway-Sant'Anna: SE reduction factor of 1.39–1.85×
+- vs Callaway-Sant'Anna: SE reduction factor of approximately 1.4–1.9×
 - vs Sun-Abraham: SE reduction factor of 3×+ (when last cohort is small)
 - Equivalent sample size gain: 2–3.4× relative to CS; 9×+ relative to SA
 

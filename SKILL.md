@@ -198,7 +198,7 @@ where $\hat{\theta}_0 = \sum_g A_{\theta,g} \bar{Y}_g$ is the unadjusted (plug-i
 **The efficiency frontier:**
 
 - **β = 0**: Simple difference-in-means. No pre-treatment adjustment. Valid but inefficient.
-  > **Implementation note**: While β=0 theoretically yields a simple difference-in-means, `staggered` v1.2.3 does not currently support `beta=0` due to a dimension-handling issue. Use the default `beta=NULL` for optimal estimation, or `beta=1` for DiD-style adjustment.
+  > **⚠️ WARNING (v1.2.3):** `beta = 0` is not supported in the current package version. Attempting `staggered(..., beta = 0)` will produce an uninformative error (`"non-conformable arguments"`). Use `beta = NULL` (default, optimal) or `beta = 1` (DiD-style) instead.
 - **β = 1**: Canonical DiD adjustment. This is what Callaway-Sant'Anna and Sun-Abraham do. Robust under parallel trends but sub-optimal under random timing.
 - **β = β\***: Variance-minimizing coefficient computed via:
 
@@ -264,7 +264,7 @@ print(cohort_sizes[cohort_sizes < 3])  # flag small cohorts
 
 ### Phase 2: Estimand Selection
 
-Choose your aggregation target based on your research question:
+Choose your aggregation target based on your research question. The `estimand` parameter is **effectively required** — despite the `NULL` default in the function signature, passing `NULL` without a custom `A_theta_list` will produce an error.
 
 | Research Question | Estimand | Code |
 |---|---|---|
@@ -597,6 +597,73 @@ cat(sprintf("95%% CI: [%.6f, %.6f]\n", ci_lower, ci_upper))
 # If ratio >> 1: heterogeneous effects; refined SE provides sharper inference
 ```
 
+### Pitfall 9: `return_full_vcv = TRUE` Changes Return Type
+
+**Symptom**: Code expecting a `data.frame` breaks after enabling `return_full_vcv`.
+
+**Cause**: With the default `return_full_vcv = FALSE`, functions return a `data.frame` (columns: estimate, se, se_neyman). With `return_full_vcv = TRUE`, the return becomes a **list** with elements: `resultsDF` (the data.frame), `vcv` (variance-covariance matrix), and `vcv_neyman` (Neyman VCV matrix).
+
+**Solution**: Access results via list elements when using full VCV:
+
+```r
+# Default (data.frame)
+result <- staggered(df = df, i = "uid", t = "period",
+                    g = "first_trained", y = "complaints",
+                    estimand = "eventstudy", eventTime = 0:23,
+                    return_full_vcv = FALSE)
+result$estimate  # works directly
+
+# With VCV (list)
+result <- staggered(df = df, i = "uid", t = "period",
+                    g = "first_trained", y = "complaints",
+                    estimand = "eventstudy", eventTime = 0:23,
+                    return_full_vcv = TRUE)
+result$resultsDF$estimate  # access via resultsDF
+result$vcv                  # refined VCV matrix
+result$vcv_neyman           # Neyman VCV matrix
+```
+
+### Pitfall 10: All-Singleton Cohorts Cause Crash
+
+**Symptom**: Error `"argument is of length zero"` after a warning about dropping singleton cohorts.
+
+**Cause**: The package automatically drops cohorts with only 1 unit (singletons). If ALL cohorts are singletons, no data remains after filtering, causing an uninformative crash.
+
+**Solution**: Ensure your data has at least some cohorts with ≥2 units:
+
+```r
+# Check cohort sizes before estimation
+cohort_sizes <- table(df[!duplicated(df$uid), ]$first_trained)
+cat("Cohorts with ≥2 units:", sum(cohort_sizes >= 2), "\n")
+cat("Singleton cohorts:", sum(cohort_sizes == 1), "\n")
+
+# If ALL are singletons, consider coarsening treatment timing
+# e.g., aggregate monthly cohorts to quarterly
+```
+
+### Pitfall 11: Extremely Small Samples Return SE = 0
+
+**Symptom**: Function returns a valid point estimate but `se = 0` and `se_neyman = 0`.
+
+**Cause**: With very few effective observations (e.g., only 2-3 units per cohort after filtering), the variance estimator degenerates to zero. The package issues a warning but does not halt execution.
+
+**Solution**: Verify sample adequacy before interpreting results:
+
+```r
+result <- staggered(df = df, i = "uid", t = "period",
+                    g = "first_trained", y = "complaints",
+                    estimand = "simple")
+if (any(result$se == 0)) {
+  warning("SE = 0 detected. Sample too small for reliable variance estimation.")
+  # Check effective sample size per cohort
+}
+```
+
+**Minimum data requirements** (rule of thumb):
+- ≥2 cohorts with ≥2 units each (absolute minimum)
+- ≥5 units per cohort for stable variance estimates
+- ≥3 pre-treatment and ≥3 post-treatment periods for event-study
+
 ---
 
 ## Anti-Patterns
@@ -755,6 +822,8 @@ The efficiency gain from using $\hat{\beta}^*$ vs $\beta = 1$ depends on outcome
 - Always check empirically: run both `staggered()` and `staggered_cs()` and report the SE ratio.
 
 ### Custom Estimands via A_theta_list
+
+**Base period normalization:** When `eventTime` includes negative values (pre-treatment lags), those periods serve as reference points. Specifically, `eventTime = -1` returns `estimate = 0, SE = 0` by construction (it is the normalized base period). This is standard event-study normalization — the effect at the reference period is mechanically zero.
 
 For non-standard aggregation schemes, you can provide custom weight matrices:
 

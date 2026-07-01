@@ -428,6 +428,8 @@ if (has_never_treated) {
 │ ├── Compare se vs se_neyman (heterogeneity check)           │
 │ ├── Optional: Fisher Randomization Test (compute_fisher)    │
 │ └── For event-study: check pre-treatment lags ≈ 0           │
+│     NOTE: eventTime = -1 returns estimate=0, SE=0 by        │
+│     construction (normalized base period). This is expected. │
 │                                                             │
 │ STEP 5: Sensitivity                                         │
 │ ├── Compare β* estimate vs β=1 estimate                     │
